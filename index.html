@@ -12,7 +12,7 @@
 <section class="card"><h2>1 · Current Status & Pending Reason</h2><div class="grid">
 <div class="field"><label for="dt">วันที่และเวลาที่อัปเดต (เวลาประเทศไทย) *</label><input id="dt" type="datetime-local" required><span class="hint">ตั้งเวลาไทยอัตโนมัติเมื่อเปิดหน้าเว็บ และแก้ไขได้</span></div>
 <div class="field"><label for="status">Current Status *</label><select id="status"></select></div>
-<div class="field"><label for="reason">Pending Reason *</label><select id="reason"></select></div>
+<div class="field"><label for="reason">Pending Reason * (ตาม Current Status)</label><select id="reason"></select><span class="hint">แสดงเฉพาะเหตุผลที่เกี่ยวข้องกับสถานะที่เลือก</span></div>
 
 </div></section>
 <section class="card"><div class="headrow"><div><h2>2 · Spare Part Information</h2><p class="hint">เพิ่มได้หลายรายการในข้อความเดียว · Part Code รองรับตัวอักษรภาษาอังกฤษ A–Z และตัวเลข 0–9 (หลายรูปแบบ)</p></div><button type="button" class="btn secondary" id="add">+ Add Part</button></div>
@@ -29,9 +29,35 @@ const REASON=[['RS00','ไม่มีเหตุขัดข้อง / ตา
 const PS=[['PS01','ยังไม่เบิก'],['PS02','เบิกแล้ว'],['PS03','ขาดสต็อก'],['PS04','กำลังจัดสรร'],['PS05','อยู่ระหว่างขนส่ง'],['PS06','ศูนย์ได้รับแล้ว'],['PS07','ติดตั้งแล้ว'],['PS08','อะไหล่ผิด / เสียหาย'],['PS09','ยกเลิก']];
 const $=id=>document.getElementById(id);let seq=0;
 function options(el,items){el.replaceChildren(...items.map(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=v+' — '+t;return o}))}
-options($('status'),STATUS);options($('reason'),REASON);
+// Suggested status-to-reason mapping. Shared reasons may appear under multiple statuses.
+const REASON_BY_STATUS={
+ ST01:['OP01','OP04','OT99'],
+ ST02:['CU01','CU02','CU03','CU04','AP01','OT99'],
+ ST03:['AP01','CU01','CU02','CU03','CU04','AP02','AP03','OT99'],
+ ST04:['RS00','CU01','CU02','CU04','AP02','AP03','AP04','OT01','IN01','IN02','IN03','IN04','OT99'],
+ ST05:['RP01','RP02','CU01','CU04','IN01','IN02','IN04','OT99'],
+ ST06:['PT01','PT02','PT03','PT04','PT05','IN03','OT99'],
+ ST07:['RS00','RP02','RP03','RP04','PT05','IN01','IN02','IN03','IN04','OT99'],
+ ST08:['RP04','RP01','RP02','CU01','CU02','CU03','AP01','AP02','AP03','PT01','PT02','PT03','PT04','PT05','OT99'],
+ ST09:['OP02','OP04','OT99'],
+ ST10:['OP03','OP04','CU01','CU03','CU04','OT99'],
+ ST11:['OP04','RP01','RP02','CU03','OT99']
+};
+// Preserve the code dictionary: this only controls which reasons are offered.
+function allowedReasons(st){const codes=REASON_BY_STATUS[st]||[];return REASON.filter(([code])=>codes.includes(code))}
+function updateReasons(){
+ const allowed=allowedReasons($('status').value);
+ options($('reason'),allowed);
+ const placeholder=document.createElement('option');
+ placeholder.value='';placeholder.textContent='-- กรุณาเลือกเหตุผลที่ตรงกับสถานะงาน --';
+ placeholder.disabled=true;
+ $('reason').prepend(placeholder);
+ $('reason').value='';
+ render();
+}
+options($('status'),STATUS);
 function thaiNow(){const x=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date());return x.replace(' ','T')}
-function setInitial(){ $('dt').value=thaiNow();$('status').value='ST03';$('reason').value='AP01';$('partsMode').value='UNKNOWN';$('parts').replaceChildren();toggleParts();render()}
+function setInitial(){ $('dt').value=thaiNow();$('status').value='ST03';updateReasons();$('partsMode').value='UNKNOWN';$('parts').replaceChildren();toggleParts();render()}
 function makeField(label,type,cls,placeholder=''){const d=document.createElement('div');d.className='field';const l=document.createElement('label');l.textContent=label;const i=document.createElement(type==='select'?'select':'input');if(type!=='select')i.type=type;i.className=cls;if(placeholder)i.placeholder=placeholder;d.append(l,i);return d}
 function addPart(){const id=++seq,box=document.createElement('div');box.className='part';box.dataset.id=String(id);const head=document.createElement('div');head.className='parthead';const strong=document.createElement('strong');strong.textContent='Spare Part #'+(document.querySelectorAll('.part').length+1);const remove=document.createElement('button');remove.type='button';remove.className='btn danger';remove.textContent='Remove';remove.addEventListener('click',()=>{box.remove();renumber();render()});head.append(strong,remove);const grid=document.createElement('div');grid.className='grid';const code=makeField('Part Code *','text','pcode','เช่น 1321001000225A, 62735, C9999500197GL');const ps=makeField('Part Status *','select','pstatus');options(ps.querySelector('select'),PS);const order=makeField('วันที่สั่งอะไหล่ (ถ้าสั่งแล้ว)','date','porder');grid.append(code,ps,order);box.append(head,grid);$('parts').append(box);render()}
 function renumber(){document.querySelectorAll('.part').forEach((p,i)=>p.querySelector('strong').textContent='Spare Part #'+(i+1))}
@@ -56,13 +82,15 @@ if(mode==='LIST'){
 if($('status').value==='ST06'&&mode==='NONE')errors.push('สถานะรออะไหล่ไม่ควรเลือกไม่ต้องใช้อะไหล่');
 const parts=mode==='NONE'?'NONE':mode==='UNKNOWN'?'UNKNOWN':entries.join(';');
 const st=$('status').value,rs=$('reason').value;
+if(!rs)errors.push('กรุณาเลือก Pending Reason ที่ตรงกับ Current Status');
+else if(!allowedReasons(st).some(([code])=>code===rs))errors.push('Pending Reason ไม่สอดคล้องกับ Current Status');
 const statusThai=STATUS.find(x=>x[0]===st)?.[1]||'ไม่ทราบสถานะ';
-const reasonThai=REASON.find(x=>x[0]===rs)?.[1]||'ไม่ทราบเหตุผล';
+const reasonThai=REASON.find(x=>x[0]===rs)?.[1]||'ยังไม่ได้เลือกเหตุผล';
 const msg=`[RP]|V=3|DT=${dt.replace('T',' ')}|ST=${st}|RS=${rs}|PARTS=${parts}|NEXT=${statusThai}|NOTE=${reasonThai}`;
 return {errors,msg}
 }
 function render(){const {errors,msg}=build();$('output').textContent=msg;$('errors').textContent=errors.join(' · ');$('copy').disabled=errors.length>0;$('feedback').textContent=''}
-$('add').addEventListener('click',addPart);$('partsMode').addEventListener('change',toggleParts);document.addEventListener('input',render);document.addEventListener('change',render);
+$('status').addEventListener('change',updateReasons);$('add').addEventListener('click',addPart);$('partsMode').addEventListener('change',toggleParts);document.addEventListener('input',render);document.addEventListener('change',render);
 $('copy').addEventListener('click',async()=>{const {errors,msg}=build();if(errors.length)return;try{await navigator.clipboard.writeText(msg);$('feedback').className='success';$('feedback').textContent='✓ คัดลอกแล้ว นำข้อความไปวางใน XMS ได้เลย'}catch(e){$('feedback').className='error';$('feedback').textContent='ไม่สามารถ Copy อัตโนมัติได้ กรุณาเลือกข้อความด้านบนแล้วคัดลอกเอง (เว็บควรเปิดผ่าน HTTPS)'}});
 $('reset').addEventListener('click',()=>{if(confirm('ล้างข้อมูลทั้งหมดและเริ่มใหม่?'))setInitial()});setInitial();
 </script></body></html>
