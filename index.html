@@ -15,7 +15,7 @@
 <div class="field"><label for="reason">Pending Reason *</label><select id="reason"></select></div>
 
 </div></section>
-<section class="card"><div class="headrow"><div><h2>2 · Spare Part Information</h2><p class="hint">เพิ่มได้หลายรายการในข้อความเดียว · รูปแบบ Part Code เช่น CXXXXXXXXXXGL</p></div><button type="button" class="btn secondary" id="add">+ Add Part</button></div>
+<section class="card"><div class="headrow"><div><h2>2 · Spare Part Information</h2><p class="hint">เพิ่มได้หลายรายการในข้อความเดียว · Part Code รองรับตัวอักษรภาษาอังกฤษ A–Z และตัวเลข 0–9 (หลายรูปแบบ)</p></div><button type="button" class="btn secondary" id="add">+ Add Part</button></div>
 <div class="field" style="max-width:480px"><label for="partsMode">ข้อมูลอะไหล่ของงานนี้ *</label><select id="partsMode"><option value="UNKNOWN">ยังไม่ทราบข้อมูลอะไหล่</option><option value="NONE">ไม่ต้องใช้อะไหล่</option><option value="LIST">ระบุรายการอะไหล่</option></select></div>
 <div id="parts"></div>
 </section>
@@ -33,7 +33,7 @@ options($('status'),STATUS);options($('reason'),REASON);
 function thaiNow(){const x=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date());return x.replace(' ','T')}
 function setInitial(){ $('dt').value=thaiNow();$('status').value='ST03';$('reason').value='AP01';$('partsMode').value='UNKNOWN';$('parts').replaceChildren();toggleParts();render()}
 function makeField(label,type,cls,placeholder=''){const d=document.createElement('div');d.className='field';const l=document.createElement('label');l.textContent=label;const i=document.createElement(type==='select'?'select':'input');if(type!=='select')i.type=type;i.className=cls;if(placeholder)i.placeholder=placeholder;d.append(l,i);return d}
-function addPart(){const id=++seq,box=document.createElement('div');box.className='part';box.dataset.id=String(id);const head=document.createElement('div');head.className='parthead';const strong=document.createElement('strong');strong.textContent='Spare Part #'+(document.querySelectorAll('.part').length+1);const remove=document.createElement('button');remove.type='button';remove.className='btn danger';remove.textContent='Remove';remove.addEventListener('click',()=>{box.remove();renumber();render()});head.append(strong,remove);const grid=document.createElement('div');grid.className='grid';const code=makeField('Part Code *','text','pcode','CXXXXXXXXXXGL');const ps=makeField('Part Status *','select','pstatus');options(ps.querySelector('select'),PS);const order=makeField('วันที่สั่งอะไหล่ (ถ้าสั่งแล้ว)','date','porder');grid.append(code,ps,order);box.append(head,grid);$('parts').append(box);render()}
+function addPart(){const id=++seq,box=document.createElement('div');box.className='part';box.dataset.id=String(id);const head=document.createElement('div');head.className='parthead';const strong=document.createElement('strong');strong.textContent='Spare Part #'+(document.querySelectorAll('.part').length+1);const remove=document.createElement('button');remove.type='button';remove.className='btn danger';remove.textContent='Remove';remove.addEventListener('click',()=>{box.remove();renumber();render()});head.append(strong,remove);const grid=document.createElement('div');grid.className='grid';const code=makeField('Part Code *','text','pcode','เช่น 1321001000225A, 62735, C9999500197GL');const ps=makeField('Part Status *','select','pstatus');options(ps.querySelector('select'),PS);const order=makeField('วันที่สั่งอะไหล่ (ถ้าสั่งแล้ว)','date','porder');grid.append(code,ps,order);box.append(head,grid);$('parts').append(box);render()}
 function renumber(){document.querySelectorAll('.part').forEach((p,i)=>p.querySelector('strong').textContent='Spare Part #'+(i+1))}
 function toggleParts(){const list=$('partsMode').value==='LIST';$('parts').hidden=!list;$('add').hidden=!list;if(list&&!document.querySelector('.part'))addPart();render()}
 function validDate(s){if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;const [y,m,d]=s.split('-').map(Number);const x=new Date(Date.UTC(y,m-1,d));return x.getUTCFullYear()===y&&x.getUTCMonth()+1===m&&x.getUTCDate()===d}
@@ -48,7 +48,7 @@ if(mode==='LIST'){
  if(!boxes.length)errors.push('กรุณาเพิ่มรายการอะไหล่อย่างน้อย 1 รายการ');
  boxes.forEach((box,i)=>{
   const code=box.querySelector('.pcode').value.trim().toUpperCase(),status=box.querySelector('.pstatus').value,order=box.querySelector('.porder').value;
-  if(!/^C[A-Z0-9]+GL$/.test(code)||!safe(code)||(order&&!validDate(order)))errors.push('กรุณาตรวจสอบ Part Code (ขึ้นต้น C ลงท้าย GL) และวันที่สั่งอะไหล่รายการ '+(i+1));
+  if(!/^[A-Z0-9]+$/.test(code)||!safe(code)||(order&&!validDate(order)))errors.push('กรุณาตรวจสอบ Part Code (ใช้ A–Z หรือ 0–9 เท่านั้น) และวันที่สั่งอะไหล่รายการ '+(i+1));
   if(['PS02','PS03','PS04','PS05','PS06','PS07','PS08'].includes(status)&&!order)errors.push('กรุณาระบุวันที่สั่งอะไหล่รายการ '+(i+1)+' หรือแก้สถานะให้ถูกต้อง');
   entries.push([code,status,order||'NA'].join('~'));
  });
